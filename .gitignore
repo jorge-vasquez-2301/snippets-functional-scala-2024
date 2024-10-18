@@ -3,4 +3,4 @@
 .metals
 .scala-build
 .vscode
-testdata/elements-celsius.csv
+testdata/*elements-celsius*
