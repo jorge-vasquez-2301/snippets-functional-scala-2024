@@ -4,3 +4,4 @@
 .scala-build
 .vscode
 testdata/*elements-celsius*
+testdata/filteredPeople.yaml
