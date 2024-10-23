@@ -1,8 +1,5 @@
 //> using jvm graalvm-java11:22.3.3
 //> using scala 3.5.1
-//> using dep co.fs2::fs2-core:3.11.0
-//> using dep dev.zio::zio:2.1.11
-//> using dep dev.zio::zio-streams:2.1.11
 //> using dep dev.zio::zio-interop-cats:23.1.0.3
 //> using dep info.fingo::spata:3.2.1
 //> using dep dev.zio::zio-schema:1.5.0
@@ -99,15 +96,22 @@ object ZIOApacheParquetExample extends ZIOAppDefault:
 
     ZIO.scoped {
       for
+        _                      <- ZIO.log(s"Writing all elements to $elementsCelsiusParquetFile")
         _                      <- ZIO.serviceWithZIO[ParquetWriter[Element]](_.writeStream(elementsCelsiusParquetFile, elementsStream))
+        _                      <- ZIO.log(s"Reading all elements from $elementsCelsiusParquetFile")
         allElementsStream      <- ZIO.serviceWith[ParquetReader[Element]](_.readStream(elementsCelsiusParquetFile))
         _                      <- writeToCsv(allElementsStream, elementsCelsiusCSVFile)
+        _                      <- ZIO.log(s"Filtering elements from $elementsCelsiusParquetFile")
         filteredElementsStream <-
           ZIO.serviceWith[ParquetReader[Element]] {
             _.readStreamFiltered(elementsCelsiusParquetFile, filter(Element.element =!= "hydrogen"))
           }
+        _                      <- ZIO.log(s"Writing filtered elements to $elementsCelsiusFilteredCSVFile")
         _                      <- writeToCsv(filteredElementsStream, elementsCelsiusFilteredCSVFile)
       yield ()
     }
 
-  override def run = processor.provide(ParquetWriter.configured[Element](), ParquetReader.configured[Element]())
+  override def run = ZIO.log(s"Processing $elementsFahrenheitCSVFile") *> processor.provide(
+    ParquetWriter.configured[Element](),
+    ParquetReader.configured[Element]()
+  )
