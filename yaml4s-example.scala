@@ -1,5 +1,5 @@
 //> using jvm graalvm-java23:23.0.0
-//> using scala 3.5.1
+//> using scala 3.5.2
 //> using dep dev.hnaderi::yaml4s-backend:0.3.0
 //> using dep dev.hnaderi::yaml4s-zio-json:0.3.0
 

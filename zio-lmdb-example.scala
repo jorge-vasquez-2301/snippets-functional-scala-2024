@@ -1,6 +1,6 @@
 //> using jvm graalvm-java23:23.0.0
 //> using javaOpt "--add-opens", "java.base/java.nio=ALL-UNNAMED", "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED"
-//> using scala 3.5.1
+//> using scala 3.5.2
 //> using dep fr.janalyse::zio-lmdb:1.8.2
 //> using dep info.fingo::spata:3.2.1
 //> using dep dev.zio::zio-interop-cats:23.1.0.3

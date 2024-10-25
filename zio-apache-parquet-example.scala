@@ -1,5 +1,5 @@
 //> using jvm graalvm-java11:22.3.3
-//> using scala 3.5.1
+//> using scala 3.5.2
 //> using dep dev.zio::zio-interop-cats:23.1.0.3
 //> using dep info.fingo::spata:3.2.1
 //> using dep dev.zio::zio-schema:1.5.0
