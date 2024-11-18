@@ -62,7 +62,7 @@ object DoobieExampleWithExtension extends ZIOAppDefault:
 
   object Repository:
     extension [A](connectionIO: ConnectionIO[A])
-      def transactZIO: RIO[Transactor[Task], A] = ZIO.serviceWithZIO[Transactor[Task]](connectionIO.transact)
+      def transactZIO: RIO[Transactor[Task], A] = ZIO.serviceWithZIO[Transactor[Task]](connectionIO.transact(_))
 
     def coffeesLessThan(price: Double): RIO[Transactor[Task], List[(String, String)]] =
       Queries.coffeesLessThan(price).transactZIO
