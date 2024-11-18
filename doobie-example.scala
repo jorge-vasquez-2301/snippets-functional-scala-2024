@@ -12,6 +12,7 @@ import zio.interop.catz.*
 import doobie.*
 import doobie.implicits.*
 import doobie.h2.H2Transactor
+import doobie.util.transactor.Transactor
 
 // Based on https://github.com/typelevel/doobie/blob/main/modules/example/src/main/scala/example/FirstExample.scala
 object DoobieExample extends ZIOAppDefault:
@@ -49,8 +50,8 @@ object DoobieExample extends ZIOAppDefault:
       }
     }
 
-  val run =
-    (for
+  val program: RIO[Transactor[Task], Unit] =
+    for
       _                 <- Repository.create
       numberOfSuppliers <- Repository.insertSuppliers(suppliers)
       numberOfCoffees   <- Repository.insertCoffees(coffees)
@@ -59,7 +60,9 @@ object DoobieExample extends ZIOAppDefault:
       _                 <- ZStream.fromIterableZIO(Repository.allCoffees).mapZIO(Console.printLine(_)).runDrain
       _                 <- ZIO.log("Getting cheap coffees")
       _                 <- ZStream.fromIterableZIO(Repository.coffeesLessThan(9.0)).mapZIO(Console.printLine(_)).runDrain
-    yield ()).provideLayer(transactorLayer)
+    yield ()
+
+  val run = program.provide(transactorLayer)
 
   object Repository:
     def coffeesLessThan(price: Double): RIO[Transactor[Task], List[(String, String)]] =
