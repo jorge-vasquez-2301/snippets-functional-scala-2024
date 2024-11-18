@@ -12,8 +12,6 @@ import doobie.implicits.*
 import doobie.h2.H2Transactor
 import io.github.gaelrenoux.tranzactio.*
 import io.github.gaelrenoux.tranzactio.doobie.*
-import _root_.doobie.util.transactor.Transactor
-import io.github.gaelrenoux.tranzactio.DatabaseOps.ServiceOps
 import org.h2.jdbcx.JdbcDataSource
 
 // Based on https://github.com/typelevel/doobie/blob/main/modules/example/src/main/scala/example/FirstExample.scala
