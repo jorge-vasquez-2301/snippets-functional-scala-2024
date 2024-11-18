@@ -6,20 +6,22 @@
 //> using dep dev.zio::zio-interop-cats:23.1.0.3
 
 import zio.*
-import zio.interop.catz.*
-import zio.lmdb.*
 import zio.json.*
+import zio.lmdb.*
+import zio.lmdb.StorageUserError.*
+import zio.interop.catz.*
 import zio.stream.interop.fs2z.*
-import java.io.File
 import info.fingo.spata.{ CSVParser, Record }
 import info.fingo.spata.io.Reader
 import java.nio.file.Paths
-import zio.lmdb.StorageUserError.CollectionNotFound
-import zio.lmdb.StorageUserError.JsonFailure
-import zio.lmdb.StorageUserError.OverSizedKey
 
-object SimpleExample extends ZIOAppDefault:
-  final case class Element(element: String, symbol: String, meltingTemp: Double, boilingTemp: Double) derives JsonCodec:
+object ZioLmdbExample extends ZIOAppDefault:
+  final case class Element(
+    element: String,
+    symbol: String,
+    meltingTemp: Double,
+    boilingTemp: Double
+  ) derives JsonCodec:
     self =>
 
     def updateTemps(f: Double => Double) =
@@ -31,12 +33,12 @@ object SimpleExample extends ZIOAppDefault:
       .parser[Task]
       .parse
 
-  def processor(elements: LMDBCollection[Element]): IO[
+  val fahrenheitCSV = "testdata/elements-fahrenheit.csv"
+
+  def loadElementsFromCSV(elements: LMDBCollection[Element]): IO[
     CollectionNotFound | JsonFailure | StorageSystemError | Throwable | OverSizedKey | Option[FetchErrors],
     Unit
   ] =
-    val fahrenheitCSV = "testdata/elements-fahrenheit.csv"
-
     def processElement(element: Element): IO[UpsertErrors | Option[FetchErrors], Option[Element]] =
       def fahrenheitToCelsius(f: Double): Double = (f - 32.0) * (5.0 / 9.0)
 
@@ -59,7 +61,7 @@ object SimpleExample extends ZIOAppDefault:
         .mapZIO(processElement)
         .runDrain
 
-  val example =
+  val program =
     val collectionName = "elements"
 
     for
@@ -71,7 +73,7 @@ object SimpleExample extends ZIOAppDefault:
                           failIfExists = false
                         ) @@ ZIOAspect.logged(s"Created collection $collectionName")
       _              <- LMDB.collectionsAvailable() @@ ZIOAspect.logged("Available collections")
-      _              <- processor(elements)
+      _              <- loadElementsFromCSV(elements)
       collected      <- elements.collect() @@ ZIOAspect.logged(s"Collected all $collectionName")
       collectionSize <- elements.size() @@ ZIOAspect.logged(s"Number of collected $collectionName")
       _              <- ZIO.foreach(collected)(Console.printLine(_))
@@ -85,4 +87,4 @@ object SimpleExample extends ZIOAppDefault:
       _              <- LMDB.collectionDrop(collectionName)
     yield ()
 
-  override def run = example.provide(LMDB.liveWithDatabaseName("lmdb-sample-database"), Scope.default)
+  override def run = program.provide(LMDB.liveWithDatabaseName("elements-database"), Scope.default)

@@ -2,8 +2,9 @@
 //> using scala 3.5.2
 //> using dep org.tpolecat::doobie-core:1.0.0-RC5
 //> using dep org.tpolecat::doobie-h2:1.0.0-RC5
+//> using dep dev.zio::zio:2.1.11
+//> using dep dev.zio::zio-streams:2.1.11
 //> using dep dev.zio::zio-interop-cats:23.1.0.3
-//> using dep io.github.gaelrenoux::tranzactio-doobie:5.2.0
 
 import zio.*
 import zio.stream.*
@@ -11,14 +12,8 @@ import zio.interop.catz.*
 import doobie.*
 import doobie.implicits.*
 import doobie.h2.H2Transactor
-import io.github.gaelrenoux.tranzactio.*
-import io.github.gaelrenoux.tranzactio.doobie.*
-import _root_.doobie.util.transactor.Transactor
-import io.github.gaelrenoux.tranzactio.DatabaseOps.ServiceOps
-import org.h2.jdbcx.JdbcDataSource
 
-// Based on https://github.com/typelevel/doobie/blob/main/modules/example/src/main/scala/example/FirstExample.scala
-object TranzactioExample extends ZIOAppDefault:
+object DoobieExampleWithExtension extends ZIOAppDefault:
 
   final case class Supplier(id: Int, name: String, street: String, city: String, state: String, zip: String)
   final case class Coffee(name: String, supplierId: Int, price: Double, sales: Int, total: Int)
@@ -39,50 +34,50 @@ object TranzactioExample extends ZIOAppDefault:
       Coffee("French_Roast_Decaf", 49, 9.99, 0, 0)
     )
 
-  val dataSourceLayer =
-    ZLayer.succeed {
-      val dataSource = JdbcDataSource()
-      dataSource.setURL("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1")
-      dataSource.setUser("sa")
-      dataSource.setPassword("")
-      dataSource
+  val transactorLayer: TaskLayer[Transactor[Task]] =
+    ZLayer.scoped {
+      ZIO.executorWith { executor =>
+        H2Transactor
+          .newH2Transactor[Task](
+            url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1",
+            user = "sa",
+            pass = "",
+            connectEC = executor.asExecutionContext
+          )
+          .toScopedZIO
+      }
     }
 
-  val program: ZIO[Database, DbException, Unit] =
-    for
-      _                                    <- Database.transactionOrDie(Repository.create)
-      (numberOfSuppliers, numberOfCoffees) <-
-        Database.transactionOrDie(Repository.insertSuppliers(suppliers) <*> Repository.insertCoffees(coffees))
-      _                                    <- ZIO.log(s"Inserted $numberOfSuppliers suppliers and $numberOfCoffees coffees")
-      _                                    <- ZIO.log("Getting all coffees")
-      _                                    <- ZStream
-                                                .fromIterableZIO(Database.transactionOrDie(Repository.allCoffees))
-                                                .mapZIO(coffee => Console.printLine(coffee).orDie)
-                                                .runDrain
-      _                                    <- ZIO.log("Getting cheap coffees")
-      _                                    <- ZStream
-                                                .fromIterableZIO(Database.transactionOrDie(Repository.coffeesLessThan(9.0)))
-                                                .mapZIO(coffee => Console.printLine(coffee).orDie)
-                                                .runDrain
-    yield ()
-
-  val run = program.provide(Database.fromDatasource, dataSourceLayer)
+  val run =
+    (for
+      _                 <- Repository.create
+      numberOfSuppliers <- Repository.insertSuppliers(suppliers)
+      numberOfCoffees   <- Repository.insertCoffees(coffees)
+      _                 <- ZIO.log(s"Inserted $numberOfSuppliers suppliers and $numberOfCoffees coffees")
+      _                 <- ZIO.log("Getting all coffees")
+      _                 <- ZStream.fromIterableZIO(Repository.allCoffees).mapZIO(Console.printLine(_)).runDrain
+      _                 <- ZIO.log("Getting cheap coffees")
+      _                 <- ZStream.fromIterableZIO(Repository.coffeesLessThan(9.0)).mapZIO(Console.printLine(_)).runDrain
+    yield ()).provideLayer(transactorLayer)
 
   object Repository:
-    def coffeesLessThan(price: Double): TranzactIO[List[(String, String)]] =
-      tzio(Queries.coffeesLessThan(price))
+    extension [A](connectionIO: ConnectionIO[A])
+      def transactZIO: RIO[Transactor[Task], A] = ZIO.serviceWithZIO[Transactor[Task]](connectionIO.transact)
 
-    def insertSuppliers(suppliers: List[Supplier]): TranzactIO[Int] =
-      tzio(Queries.insertSuppliers(suppliers))
+    def coffeesLessThan(price: Double): RIO[Transactor[Task], List[(String, String)]] =
+      Queries.coffeesLessThan(price).transactZIO
 
-    def insertCoffees(coffees: List[Coffee]): TranzactIO[Int] =
-      tzio(Queries.insertCoffees(coffees))
+    def insertSuppliers(suppliers: List[Supplier]): RIO[Transactor[Task], Int] =
+      Queries.insertSuppliers(suppliers).transactZIO
 
-    val allCoffees: TranzactIO[List[Coffee]] =
-      tzio(Queries.allCoffees)
+    def insertCoffees(coffees: List[Coffee]): RIO[Transactor[Task], Int] =
+      Queries.insertCoffees(coffees).transactZIO
 
-    val create: TranzactIO[Unit] =
-      tzio(Queries.create).unit
+    val allCoffees: RIO[Transactor[Task], List[Coffee]] =
+      Queries.allCoffees.transactZIO
+
+    val create: RIO[Transactor[Task], Unit] =
+      Queries.create.transactZIO.unit
 
   object Queries:
 

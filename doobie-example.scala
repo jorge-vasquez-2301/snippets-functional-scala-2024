@@ -62,23 +62,20 @@ object DoobieExample extends ZIOAppDefault:
     yield ()).provideLayer(transactorLayer)
 
   object Repository:
-    extension [A](connectionIO: ConnectionIO[A])
-      def transactZIO: RIO[Transactor[Task], A] = ZIO.serviceWithZIO[Transactor[Task]](connectionIO.transact)
-
     def coffeesLessThan(price: Double): RIO[Transactor[Task], List[(String, String)]] =
-      Queries.coffeesLessThan(price).transactZIO
+      ZIO.serviceWithZIO[Transactor[Task]](Queries.coffeesLessThan(price).transact(_))
 
     def insertSuppliers(suppliers: List[Supplier]): RIO[Transactor[Task], Int] =
-      Queries.insertSuppliers(suppliers).transactZIO
+      ZIO.serviceWithZIO[Transactor[Task]](Queries.insertSuppliers(suppliers).transact(_))
 
     def insertCoffees(coffees: List[Coffee]): RIO[Transactor[Task], Int] =
-      Queries.insertCoffees(coffees).transactZIO
+      ZIO.serviceWithZIO[Transactor[Task]](Queries.insertCoffees(coffees).transact(_))
 
     val allCoffees: RIO[Transactor[Task], List[Coffee]] =
-      Queries.allCoffees.transactZIO
+      ZIO.serviceWithZIO[Transactor[Task]](Queries.allCoffees.transact(_))
 
     val create: RIO[Transactor[Task], Unit] =
-      Queries.create.transactZIO.unit
+      ZIO.serviceWithZIO[Transactor[Task]](Queries.create.transact(_)).unit
 
   object Queries:
 
