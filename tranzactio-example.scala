@@ -2,7 +2,6 @@
 //> using scala 3.5.2
 //> using dep org.tpolecat::doobie-core:1.0.0-RC5
 //> using dep org.tpolecat::doobie-h2:1.0.0-RC5
-//> using dep dev.zio::zio-interop-cats:23.1.0.3
 //> using dep io.github.gaelrenoux::tranzactio-doobie:5.2.0
 
 import zio.*
