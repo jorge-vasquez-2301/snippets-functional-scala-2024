@@ -89,7 +89,7 @@ object ZIOApacheParquetExample extends ZIOAppDefault:
       .mapZIO(record => ZIO.fromEither(record.to[Element]))
       .map(_.updateTemps(fahrenheitToCelsius))
 
-  def writeToCsv(stream: ZStream[Scope, Throwable, Element], path: java.nio.file.Path) =
+  def writeStreamToCsv(stream: ZStream[Scope, Throwable, Element], path: java.nio.file.Path) =
     stream
       .map(_.toRecord)
       .toFs2Stream
@@ -112,9 +112,18 @@ object ZIOApacheParquetExample extends ZIOAppDefault:
         _                      <- ZIO.serviceWithZIO[ParquetWriter[Element]] {
                                     _.writeStream(elementsCelsiusParquetFile, readFromCsvAndProcess)
                                   }
-        _                      <- ZIO.log(s"Reading all elements from $elementsCelsiusParquetFile")
+        _                      <- ZIO.log(s"Reading all elements from $elementsCelsiusParquetFile, as a Chunk")
+        allElementsChunk       <- ZIO.serviceWith[ParquetReader[Element]](_.readChunk(elementsCelsiusParquetFile))
+        _                      <- ZIO.log(s"Reading all elements from $elementsCelsiusParquetFile, as a ZStream")
         allElementsStream      <- ZIO.serviceWith[ParquetReader[Element]](_.readStream(elementsCelsiusParquetFile))
-        _                      <- ZIO.log(s"Reading and filtering elements from $elementsCelsiusParquetFile")
+        _                      <- ZIO.log(s"Reading and filtering elements from $elementsCelsiusParquetFile, as a Chunk")
+        filteredElementsChunk  <- ZIO.serviceWith[ParquetReader[Element]] {
+                                    _.readChunkFiltered(
+                                      elementsCelsiusParquetFile,
+                                      filter(Element.element =!= "hydrogen" `and` Element.meltingTemp > 0)
+                                    )
+                                  }
+        _                      <- ZIO.log(s"Reading and filtering elements from $elementsCelsiusParquetFile, as a ZStream")
         filteredElementsStream <- ZIO.serviceWith[ParquetReader[Element]] {
                                     _.readStreamFiltered(
                                       elementsCelsiusParquetFile,
@@ -122,7 +131,7 @@ object ZIOApacheParquetExample extends ZIOAppDefault:
                                     )
                                   }
         _                      <- ZIO.log(s"Writing filtered elements to $elementsCelsiusFilteredCSVFile")
-        _                      <- writeToCsv(filteredElementsStream, elementsCelsiusFilteredCSVFile)
+        _                      <- writeStreamToCsv(filteredElementsStream, elementsCelsiusFilteredCSVFile)
       yield ()
     }
 
