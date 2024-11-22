@@ -47,8 +47,11 @@ object TranzactioExampleWithTransactions extends ZIOAppDefault:
   val program: ZIO[Database, DbException, Unit] =
     for
       _                                    <- Database.transactionOrDie(Repository.create)
-      (numberOfSuppliers, numberOfCoffees) <-
-        Database.transactionOrDie(Repository.insertSuppliers(suppliers) <*> Repository.insertCoffees(coffees))
+      (numberOfSuppliers, numberOfCoffees) <- Database.transactionOrDie {
+                                                Repository.insertSuppliers(suppliers) <*> Repository.insertCoffees(
+                                                  coffees
+                                                )
+                                              }
       _                                    <- ZIO.log(s"Inserted $numberOfSuppliers suppliers and $numberOfCoffees coffees")
       _                                    <- ZIO.log("Getting all coffees")
       _                                    <- ZStream
