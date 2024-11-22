@@ -9,6 +9,7 @@
 import zio.*
 import zio.stream.*
 import zio.interop.catz.*
+import zio.stream.interop.fs2z.*
 import doobie.*
 import doobie.implicits.*
 import doobie.h2.H2Transactor
@@ -64,6 +65,12 @@ object DoobieExampleWithExtension extends ZIOAppDefault:
     extension [A](connectionIO: ConnectionIO[A])
       def transactZIO: RIO[Transactor[Task], A] = ZIO.serviceWithZIO[Transactor[Task]](connectionIO.transact(_))
 
+    extension [A](connectionIOStream: fs2.Stream[ConnectionIO, A])
+      def transactZStream: ZStream[Transactor[Task], Throwable, A] =
+        ZStream.serviceWithStream[Transactor[Task]] { transactor =>
+          connectionIOStream.transact(transactor).toZStream()
+        }
+
     def coffeesLessThan(price: Double): RIO[Transactor[Task], List[(String, String)]] =
       Queries.coffeesLessThan(price).transactZIO
 
@@ -75,6 +82,9 @@ object DoobieExampleWithExtension extends ZIOAppDefault:
 
     val allCoffees: RIO[Transactor[Task], List[Coffee]] =
       Queries.allCoffees.transactZIO
+
+    val allCoffeesStream: ZStream[Transactor[Task], Throwable, Coffee] =
+      Queries.allCoffeesStream.transactZStream
 
     val create: RIO[Transactor[Task], Unit] =
       Queries.create.transactZIO.unit
@@ -96,6 +106,9 @@ object DoobieExampleWithExtension extends ZIOAppDefault:
 
     val allCoffees: ConnectionIO[List[Coffee]] =
       sql"SELECT cof_name, sup_id, price, sales, total FROM coffees".query[Coffee].to[List]
+
+    val allCoffeesStream: fs2.Stream[ConnectionIO, Coffee] =
+      sql"SELECT cof_name, sup_id, price, sales, total FROM coffees".query[Coffee].stream
 
     val create: ConnectionIO[Int] =
       sql"""

@@ -44,7 +44,7 @@ object TranzactioExample extends ZIOAppDefault:
       dataSource
     }
 
-  val program: ZIO[Database, DbException, Unit] =
+  val program: ZIO[Database, Throwable, Unit] =
     for
       _                 <- Database.transactionOrDie(Repository.create)
       numberOfSuppliers <- Database.transactionOrDie(Repository.insertSuppliers(suppliers))
@@ -55,6 +55,8 @@ object TranzactioExample extends ZIOAppDefault:
                              .fromIterableZIO(Database.transactionOrDie(Repository.allCoffees))
                              .mapZIO(coffee => Console.printLine(coffee).orDie)
                              .runDrain
+      _                 <- ZIO.log("Getting all coffees as ZStream")
+      _                 <- Database.transactionOrDieStream(Repository.allCoffeesStream).mapZIO(Console.printLine(_)).runDrain
       _                 <- ZIO.log("Getting cheap coffees")
       _                 <- ZStream
                              .fromIterableZIO(Database.transactionOrDie(Repository.coffeesLessThan(9.0)))
@@ -77,6 +79,9 @@ object TranzactioExample extends ZIOAppDefault:
     val allCoffees: TranzactIO[List[Coffee]] =
       tzio(Queries.allCoffees)
 
+    val allCoffeesStream: TranzactIOStream[Coffee] =
+      tzioStream(Queries.allCoffeesStream)
+
     val create: TranzactIO[Unit] =
       tzio(Queries.create).unit
 
@@ -97,6 +102,9 @@ object TranzactioExample extends ZIOAppDefault:
 
     val allCoffees: ConnectionIO[List[Coffee]] =
       sql"SELECT cof_name, sup_id, price, sales, total FROM coffees".query[Coffee].to[List]
+
+    val allCoffeesStream: fs2.Stream[ConnectionIO, Coffee] =
+      sql"SELECT cof_name, sup_id, price, sales, total FROM coffees".query[Coffee].stream
 
     val create: ConnectionIO[Int] =
       sql"""
