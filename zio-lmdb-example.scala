@@ -65,26 +65,30 @@ object ZioLmdbExample extends ZIOAppDefault:
     val collectionName = "elements"
 
     for
-      _              <- LMDB.collectionExists(
-                          collectionName
-                        ) @@ ZIOAspect.logged(s"Checking whether collection $collectionName exists")
-      elements       <- LMDB.collectionCreate[Element](
-                          collectionName,
-                          failIfExists = false
-                        ) @@ ZIOAspect.logged(s"Created collection $collectionName")
-      _              <- LMDB.collectionsAvailable() @@ ZIOAspect.logged("Available collections")
-      _              <- loadElementsFromCSV(elements)
-      collected      <- elements.collect() @@ ZIOAspect.logged(s"Collected all $collectionName")
-      collectionSize <- elements.size() @@ ZIOAspect.logged(s"Number of collected $collectionName")
-      _              <- ZIO.foreach(collected)(Console.printLine(_))
-      filtered       <- elements.collect(
-                          keyFilter = _.startsWith("H"),
-                          valueFilter = _.meltingTemp < -15
-                        ) @@ ZIOAspect.logged(s"Filtered $collectionName")
-      _              <- ZIO.log(s"Clearing collection $collectionName")
-      _              <- elements.clear()
-      _              <- ZIO.log(s"Dropping collection $collectionName")
-      _              <- LMDB.collectionDrop(collectionName)
+      _                    <- LMDB.collectionExists(
+                                collectionName
+                              ) @@ ZIOAspect.logged(s"Checking whether collection $collectionName exists")
+      elements             <- LMDB.collectionCreate[Element](
+                                collectionName,
+                                failIfExists = false
+                              ) @@ ZIOAspect.logged(s"Created collection $collectionName")
+      _                    <- LMDB.collectionsAvailable() @@ ZIOAspect.logged("Available collections")
+      _                    <- loadElementsFromCSV(elements)
+      collected            <- elements.collect() @@ ZIOAspect.logged(s"Collected all $collectionName")
+      collectionSize       <- elements.size() @@ ZIOAspect.logged(s"Number of collected $collectionName")
+      _                    <- ZIO.foreach(collected)(Console.printLine(_))
+      filtered             <- elements.collect(
+                                keyFilter = _.startsWith("H"),
+                                valueFilter = _.meltingTemp < -15
+                              ) @@ ZIOAspect.logged(s"Filtered $collectionName")
+      _                    <- ZIO.logInfo(s"Creating stream of elements for $collectionName")
+      elementsStream        = elements.stream()
+      _                    <- ZIO.logInfo(s"Creating stream of elements for $collectionName, including keys")
+      symbolToElementStream = elements.streamWithKeys()
+      _                    <- ZIO.log(s"Clearing collection $collectionName")
+      _                    <- elements.clear()
+      _                    <- ZIO.log(s"Dropping collection $collectionName")
+      _                    <- LMDB.collectionDrop(collectionName)
     yield ()
 
   override def run = program.provide(LMDB.liveWithDatabaseName("elements-database"), Scope.default)
