@@ -41,7 +41,7 @@ object Yaml4sExample extends ZIOAppDefault:
   def readFile(fileName: String): Task[String] =
     ZStream.fromFileName(fileName).via(ZPipeline.utf8Decode).runCollect.map(_.mkString)
 
-  def printFile(contents: String, fileName: String): Task[Long] =
+  def writeFile(contents: String, fileName: String): Task[Long] =
     ZStream(contents).via(ZPipeline.utf8Encode).run(ZSink.fromFileName(fileName))
 
   val peopleYaml         = "testdata/people.yaml"
@@ -58,5 +58,5 @@ object Yaml4sExample extends ZIOAppDefault:
       filteredPeopleJson   <- ZIO.fromEither(filteredPeople.toJsonAST)
       filteredPeopleYamlStr = Backend.print(filteredPeopleJson)
       _                    <- ZIO.log(s"Writing $filteredPeopleYaml")
-      _                    <- printFile(filteredPeopleYamlStr, filteredPeopleYaml)
+      _                    <- writeFile(filteredPeopleYamlStr, filteredPeopleYaml)
     yield ()
