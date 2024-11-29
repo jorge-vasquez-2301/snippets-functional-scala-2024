@@ -46,7 +46,8 @@ object ZioLmdbExample extends ZIOAppDefault:
         .through(csvParser)
         .toZStream()
         .mapZIO(record => ZIO.fromEither(record.to[Element]))
-        .mapZIO(element => elements.upsertOverwrite(element.symbol, element.updateTemps(fahrenheitToCelsius)))
+        .map(_.updateTemps(fahrenheitToCelsius))
+        .mapZIO(element => elements.upsertOverwrite(element.symbol, element))
         .runDrain
 
   val program =
