@@ -75,15 +75,15 @@ object ZIOApacheParquetExample extends ZIOAppDefault:
       .renderer[Eff]
       .render
 
-  val elementsFahrenheitCSVFile      = Paths.get("testdata/elements-fahrenheit.csv")
-  val elementsCelsiusParquetFile     = Path(Paths.get("testdata/elements-celsius.parquet"))
-  val elementsCelsiusFilteredCSVFile = Paths.get("testdata/elements-celsius-filtered.csv")
+  val fahrenheitCSVFile      = Paths.get("testdata/elements-fahrenheit.csv")
+  val celsiusParquetFile     = Path(Paths.get("testdata/elements-celsius.parquet"))
+  val celsiusFilteredCSVFile = Paths.get("testdata/elements-celsius-filtered.csv")
 
   val readFromCsvAndProcess: ZStream[Scope, Throwable, Element] =
     def fahrenheitToCelsius(f: Double): Double = (f - 32.0) * (5.0 / 9.0)
 
     Reader[Eff]
-      .read(elementsFahrenheitCSVFile)
+      .read(fahrenheitCSVFile)
       .through(csvParser)
       .toZStream()
       .mapZIO(record => ZIO.fromEither(record.to[Element]))
@@ -101,8 +101,10 @@ object ZIOApacheParquetExample extends ZIOAppDefault:
   val processor: RIO[ParquetWriter[Element] & ParquetReader[Element], Unit] =
     ZIO.scoped {
       for
-        _                      <- ZIO.log(s"Writing all elements to $elementsCelsiusParquetFile, records' schema will be:")
-        _                      <- ZIO.log(Element.schemaEncoder.encode(Element.schema, "element", optional = false).toString)
+        _                      <- ZIO.log(s"Writing all elements to $celsiusParquetFile")
+        _                      <- ZIO.log(s"The Parquet schema will be:")
+        parquetSchema           = Element.schemaEncoder.encode(Element.schema, "element", optional = false)
+        _                      <- ZIO.log(parquetSchema.toString)
         //                      required group element {
         //                        required binary element (STRING);
         //                        required binary symbol (STRING);
@@ -110,33 +112,33 @@ object ZIOApacheParquetExample extends ZIOAppDefault:
         //                        required double boilingTemp;
         //                      }
         _                      <- ZIO.serviceWithZIO[ParquetWriter[Element]] {
-                                    _.writeStream(elementsCelsiusParquetFile, readFromCsvAndProcess)
+                                    _.writeStream(celsiusParquetFile, readFromCsvAndProcess)
                                   }
-        _                      <- ZIO.log(s"Reading all elements from $elementsCelsiusParquetFile, as a Chunk")
-        allElementsChunk       <- ZIO.serviceWith[ParquetReader[Element]](_.readChunk(elementsCelsiusParquetFile))
-        _                      <- ZIO.log(s"Reading all elements from $elementsCelsiusParquetFile, as a ZStream")
-        allElementsStream      <- ZIO.serviceWith[ParquetReader[Element]](_.readStream(elementsCelsiusParquetFile))
-        _                      <- ZIO.log(s"Reading and filtering elements from $elementsCelsiusParquetFile, as a Chunk")
+        _                      <- ZIO.log(s"Reading all elements from $celsiusParquetFile, as a Chunk")
+        allElementsChunk       <- ZIO.serviceWith[ParquetReader[Element]](_.readChunk(celsiusParquetFile))
+        _                      <- ZIO.log(s"Reading all elements from $celsiusParquetFile, as a ZStream")
+        allElementsStream      <- ZIO.serviceWith[ParquetReader[Element]](_.readStream(celsiusParquetFile))
+        _                      <- ZIO.log(s"Reading/filtering elements from $celsiusParquetFile, as a Chunk")
         filteredElementsChunk  <- ZIO.serviceWith[ParquetReader[Element]] {
                                     _.readChunkFiltered(
-                                      elementsCelsiusParquetFile,
+                                      celsiusParquetFile,
                                       filter(Element.element =!= "hydrogen" `and` Element.meltingTemp > 0)
                                     )
                                   }
-        _                      <- ZIO.log(s"Reading and filtering elements from $elementsCelsiusParquetFile, as a ZStream")
+        _                      <- ZIO.log(s"Reading/filtering elements from $celsiusParquetFile, as a ZStream")
         filteredElementsStream <- ZIO.serviceWith[ParquetReader[Element]] {
                                     _.readStreamFiltered(
-                                      elementsCelsiusParquetFile,
+                                      celsiusParquetFile,
                                       filter(Element.element =!= "hydrogen" `and` Element.meltingTemp > 0)
                                     )
                                   }
-        _                      <- ZIO.log(s"Writing filtered elements to $elementsCelsiusFilteredCSVFile")
-        _                      <- writeStreamToCsv(filteredElementsStream, elementsCelsiusFilteredCSVFile)
+        _                      <- ZIO.log(s"Writing filtered elements to $celsiusFilteredCSVFile")
+        _                      <- writeStreamToCsv(filteredElementsStream, celsiusFilteredCSVFile)
       yield ()
     }
 
   override def run =
-    ZIO.log(s"Processing $elementsFahrenheitCSVFile")
+    ZIO.log(s"Processing $fahrenheitCSVFile")
       *> processor.provide(
         ParquetWriter.configured[Element](writeMode = ParquetFileWriter.Mode.OVERWRITE),
         ParquetReader.configured[Element]()

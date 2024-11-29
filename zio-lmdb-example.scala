@@ -35,30 +35,18 @@ object ZioLmdbExample extends ZIOAppDefault:
 
   val fahrenheitCSV = "testdata/elements-fahrenheit.csv"
 
-  def loadElementsFromCSV(elements: LMDBCollection[Element]): IO[
-    CollectionNotFound | JsonFailure | StorageSystemError | Throwable | OverSizedKey | Option[FetchErrors],
-    Unit
-  ] =
-    def processElement(element: Element): IO[UpsertErrors | Option[FetchErrors], Option[Element]] =
-      def fahrenheitToCelsius(f: Double): Double = (f - 32.0) * (5.0 / 9.0)
+  def loadElementsFromCSV(
+    elements: LMDBCollection[Element]
+  ): IO[Throwable | OverSizedKey | (CollectionNotFound | JsonFailure | StorageSystemError), Unit] =
+    def fahrenheitToCelsius(f: Double): Double = (f - 32.0) * (5.0 / 9.0)
 
-      elements.upsertOverwrite(element.symbol, element)
-        *> elements.contains(element.symbol) @@ ZIOAspect.logged(
-          s"Checking whether ${elements.name} contains ${element.symbol}"
-        )
-        *> elements.fetch(element.symbol).some @@ ZIOAspect.logged("Found element")
-        *> elements.update(
-          element.symbol,
-          _.updateTemps(fahrenheitToCelsius)
-        ) @@ ZIOAspect.logged("Updated element")
-
-    ZIO.log(s"Processing $fahrenheitCSV")
+    ZIO.log(s"Loading $fahrenheitCSV into LMDB")
       *> Reader[Task]
         .read(Paths.get(fahrenheitCSV))
         .through(csvParser)
         .toZStream()
         .mapZIO(record => ZIO.fromEither(record.to[Element]))
-        .mapZIO(processElement)
+        .mapZIO(element => elements.upsertOverwrite(element.symbol, element.updateTemps(fahrenheitToCelsius)))
         .runDrain
 
   val program =
